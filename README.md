@@ -1,5 +1,5 @@
 # SPHY Framework & Dimod Annealer Simulation Suite
-
+https://sphywow1977.streamlit.app/
 Welcome to the **SPHY Framework** repository. This distributed computing environment is designed to demonstrate, benchmark, and audit the resilience of quantum-inspired algorithms and adiabatic annealing loops against hardware-level noise, such as decoherence and bit-flips.
 
 This project is provided as a **free, open-source service** for any researcher, student, or developer who wants to explore the mechanics of the `dimod` SDK, Ising model optimizations, and real-time fault-tolerance architectures.
