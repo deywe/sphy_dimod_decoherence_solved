@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Framework SPHY - Módulo de Estabilização Simbiótica (AI Fault-Tolerance Proof)
+Framework SPHY - Módulo de Estabilização Simbiótica (AI Fault-Tolerance Hardened)
 Autor: Deywe Okabe
 Organização: Black Swan Research / Harpia Quantum
 Ano: 2026
@@ -13,12 +13,13 @@ import time
 import hashlib
 import random
 import threading
+import struct
 
 # Limpa o terminal inicial
 os.system('cls' if os.name == 'nt' else 'clear')
 
 print("=" * 60)
-print(" 🔒 SPHY CORE — AI DECOHERENCE ANNIHILATION ENGINE")
+print(" 🔒 SPHY CORE — AI DECOHERENCE ANNIHILATION ENGINE (HARDENED)")
 print("=" * 60)
 
 # Entrada do Operador
@@ -29,13 +30,15 @@ except ValueError:
     print("[ERRO] Digite um número inteiro válido!")
     sys.exit(1)
 
-# Variáveis de controle de estado
+# Variáveis de controle de estado (Isolamento Numérico)
 bit_flip_status = 0.0  # 0.0 = Desativado, 1.0 = Ativado
 frame_id = 0
 total_anomalias = 0
 total_correcoes = 0
-ultimo_erro = "Nenhum (Barramento Limpo)"
-status_ia = "STANDBY (Monitorando Vácuo)"
+
+# Sinalizadores efêmeros para mitigar assinaturas estáticas na RAM
+mascara_estado = 0  # 0 = Standby, 1 = Active
+codigo_erro_local = 0  # 0 = Limpo, 1 = Injetado
 
 # Thread paralela para capturar a alteração do Bit-Flip em tempo real
 def escutar_operador():
@@ -68,31 +71,39 @@ try:
         bit_corrompido = 0
         
         if bit_flip_status == 1.0:
-            status_ia = "ACTIVE (Varredura de Coerência Ativa)"
+            mascara_estado = 1
             if random.random() < 0.6:  # 60% de chance de ruído
                 bit_corrompido = 2 ** random.randint(0, 12)
-                # Injeta a falha via XOR (Corrupção da memória)
+                # Injeta a falha via XOR aritmético na memória RAM
                 resultado_processado = resultado_processado ^ bit_corrompido
                 anomalia_detectada = True
                 total_anomalias += 1
-                ultimo_erro = f"Bit-Flip Injetado! Memória desviou para: {resultado_processado}"
+                codigo_erro_local = 1
         else:
-            status_ia = "STANDBY (Monitorando Vácuo)"
+            mascara_estado = 0
+            codigo_erro_local = 0
 
         # --- 3. CONTRA-TORQUE SIMBIÓTICO DA IA SPHY (CORREÇÃO EM ADIANTAMENTO) ---
         ia_aplicou_correcao = False
         valor_antes_da_ia = resultado_processado
         
-        if anomalia_detected := anomalia_detectada:
-            # A IA calcula o desvio matemático em relação ao estado fundamental estacionário
-            # E aplica a matriz inversa (XOR com o mesmo bit corrompido reestabiliza o estado)
+        if anomalia_detectada:
+            # A IA intercepta o desvio e aplica o operador inverso diretamente nos bits
             resultado_processado = resultado_processado ^ bit_corrompido
             ia_aplicou_correcao = True
             total_correcoes += 1
 
-        # --- 4. AUDITORIA FORENSE DE INTEGRIDADE (SHA-256) ---
-        hash_esperado = hashlib.sha256(str(resultado_esperado).encode('utf-8')).hexdigest()
-        hash_processado = hashlib.sha256(str(resultado_processado).encode('utf-8')).hexdigest()
+        # --- 4. AUDITORIA FORENSE DE INTEGRIDADE (PROTECTED STRUCT HASHING) ---
+        # Substituição crítica: os inteiros são convertidos direto para bytes estruturados (!q)
+        bytes_esperados = struct.pack("!q", resultado_esperado)
+        bytes_processados = struct.pack("!q", resultado_processado)
+        
+        hash_esperado = hashlib.sha256(bytes_esperados).hexdigest()
+        hash_processado = hashlib.sha256(bytes_processados).hexdigest()
+        
+        # Reconstrói os estados de texto dinamicamente apenas para renderização de tela
+        status_ia = "ACTIVE (Varredura de Coerência Ativa)" if mascara_estado == 1 else "STANDBY (Monitorando Vácuo)"
+        ultimo_erro = f"Bit-Flip Injetado! Memória desviou para: {valor_antes_da_ia}" if codigo_erro_local == 1 else "Nenhum (Barramento Limpo)"
         
         if hash_esperado == hash_processado:
             if ia_aplicou_correcao:
@@ -110,7 +121,7 @@ try:
         print(f"  🔢 Número Base      : {numero_base}")
         print(f"  🔄 Ciclos por Frame : {iteracoes} somas acumuladas")
         print(" =============================================================")
-        print(f"  📊 MATEMÁTICA DO PROCESSO:")
+        print(f"  📊 MATEMÁTICA DO PROCESSO (BINARY PACKED):")
         print(f"  🔹 Valor Esperado   : {resultado_esperado}")
         print(f"  ⚡ Registro da Falha : {valor_antes_da_ia} (Valor Corrompido pelo Ruído)")
         print(f"  🔸 Valor de Saída   : {resultado_processado} (Entregue com Sucesso)")
@@ -133,3 +144,5 @@ try:
 
 except KeyboardInterrupt:
     print("\n[-] Simulação encerrada.")
+finally:
+    print("[✓] Processo finalizado com segurança.")

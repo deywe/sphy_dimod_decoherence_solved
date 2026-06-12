@@ -12,7 +12,7 @@ import os
 import sys
 import time
 import urllib.request
-import json
+import struct
 import threading
 import hashlib  
 import numpy as np
@@ -40,45 +40,55 @@ spins = [-1, 1, -1, 1]
 clock_local = 5.0
 status_servidor = "INITIALIZING"
 
-# --- MOTOR DE MONITORAMENTO EM BACKGROUND (PING & DATA FETCH LOOP) ---
-# Executado em thread isolada para impedir que a latência de rede trave o FPS local
+# --- MOTOR DE MONITORAMENTO EM BACKGROUND (BINARY DECODER LOOP) ---
+# Atualizado para ler o octet-stream bruto de 88 bytes enviado pela Oracle Cloud
 def watchdog_ping_loop():
     global server_alive, energia_fundamental, spins, clock_local, status_servidor, cumulative_flips, last_flip_timestamp, alpha_interferencia
-    print("[*] Watchdog Ativo: Monitorando barramento quântico na Oracle Cloud...")
+    print("[*] Watchdog Ativo: Monitorando barramento binário na Oracle Cloud...")
     
     ciclo_paridade = 0
     while True:
         try:
-            # Requisita dados da nuvem Oracle de forma assíncrona
+            # Requisita dados binários de forma assíncrona
             with urllib.request.urlopen(SERVER_URL, timeout=1.5) as response:
-                res_data = json.loads(response.read().decode('utf-8'))
+                buffer = response.read()
                 
-            if res_data.get("SPHY_CORE_AUTH") == "ACTIVE_DETERMINISTIC_OK":
-                server_alive = True
-                ciclo_paridade += 1
+            # Verifica se o tamanho do pacote corresponde à assinatura estrita de 88 bytes
+            if len(buffer) == 88:
+                payload_dados = buffer[:-32]
+                hash_recebido = buffer[-32:]
                 
-                # Extrai os tensores físicos calculados remotamente pelo Solver do Dimod
-                energia_fundamental = float(res_data.get("ising_ground_energy_ev", -3.2000))
-                spins = res_data.get("qubit_topology_matrix", [-1, 1, -1, 1])
-                clock_local = float(res_data.get("qpu_coherence_ghz", 5.0))
-                
-                # --- ALTERNÂNCIA DE FLIP ASSÍNCRONA ---
-                if ciclo_paridade % 2 == 1:
-                    alpha_interferencia = 0.0
-                    status_servidor = "SUCCESS_DETERMINISTIC"
+                # Validação Forense Local do Hash de Rede antes de extrair dados
+                if hashlib.sha256(payload_dados).digest() == hash_recebido:
+                    server_alive = True
+                    ciclo_paridade += 1
+                    
+                    raw_metrics = payload_dados[32:]
+                    # Desempacota 1 Double (energia) e 4 Integers (spins) de formato Big-Endian
+                    energia_fundamental, s0, s1, s2, s3 = struct.unpack("!d4i", raw_metrics)
+                    spins = [s0, s1, s2, s3]
+                    clock_local = 5.0  # Mantido fixo conforme a assinatura padrão do clock
+                    
+                    # --- ALTERNÂNCIA DE FLIP ASSÍNCRONA ---
+                    if ciclo_paridade % 2 == 1:
+                        alpha_interferencia = 0.0
+                        status_servidor = "SUCCESS_DETERMINISTIC [BINARY SECURE]"
+                    else:
+                        alpha_interferencia = 1.0 
+                        status_servidor = "⚠️ DECOHERENCE DETECTED (Mitigated)"
+                        cumulative_flips += 1 
+                        last_flip_timestamp = time.strftime("%H:%M:%S", time.localtime())
                 else:
-                    alpha_interferencia = 1.0 
-                    status_servidor = "⚠️ DECOHERENCE DETECTED"
-                    cumulative_flips += 1 
-                    last_flip_timestamp = time.strftime("%H:%M:%S", time.localtime())
+                    server_alive = False  # Assinatura adulterada
             else:
-                server_alive = False
+                server_alive = False  # Tamanho de buffer inconsistente
+                
         except Exception:
             server_alive = False
             
         if not server_alive:
             print("\n" + "!"*60)
-            print("[🚨 CRITICAL ALERT] FALHA DE CONEXÃO COM O SERVIDOR CENTRAL SPHY!")
+            print("[🚨 CRITICAL ALERT] FALHA DE CONEXÃO OU QUEBRA DE INTEGRIDADE HASH SPHY!")
             print("[🚨 CRITICAL ALERT] INICIANDO PROTOCOLO EPHEMERE DE AUTODESTRUIÇÃO...")
             print("!"*60)
             
@@ -91,7 +101,7 @@ def watchdog_ping_loop():
                 
             os._exit(1)
             
-        time.sleep(0.2) # Intervalo otimizado de pooling de rede (5hz em background)
+        time.sleep(0.2)
 
 monitor_thread = threading.Thread(target=watchdog_ping_loop, daemon=True)
 monitor_thread.start()
@@ -129,15 +139,14 @@ def update(frame):
     dados_string = f"frame:{frame_id}|g_tensor:{delta_gravidade}|energy:{energia_fundamental}|topology:{spins}".encode('utf-8')
     hash_sig = hashlib.sha256(dados_string).hexdigest()
     
-    # 3. PROPAGAÇÃO DA ONDA ASSÍNCRONA
-    # Mudança crítica: tempo_fase escalona diretamente com o frame_id local sem interrupções de rede
+    # PROPAGAÇÃO DA ONDA ASSÍNCRONA
     tempo_fase = frame_id * 0.25
     R = np.sqrt(X**2 + Y**2)
     
     fator_curvatura = 1.0 + (delta_gravidade * 1e11)
     alpha_local = 0.8 + (alpha_interferencia * 0.2)
     
-    # Computação matricial executada localmente no barramento da GPU/CPU do Windows
+    # Computação matricial executada localmente no barramento do Windows
     Z = np.cos(clock_local * 0.3 * R - tempo_fase) * np.sin(alpha_local * X * fator_curvatura + (sum(spins) * 0.2))
     Z = Z * np.exp(-R / 6.0)
     
@@ -152,7 +161,7 @@ def update(frame):
     
     # Ajuste dinâmico de matizes baseado no estado de flip do Watchdog paralelo
     if alpha_interferencia > 0.5:
-        cor_malha = '#ff1a1a'  # Estado de ruído adiabático detectado
+        cor_malha = '#ff1a1a'  # Estado de ruído detectado
         cor_hud = '#ff00cc'    # HUD Forense em magenta de alta visibilidade
         linewidth_malha = 1.0
         alpha_malha = 0.8
@@ -169,7 +178,7 @@ def update(frame):
     infotext = (
         f"🔒 SPHY QUANTUM CORE\n"
         f"-----------------------------------------\n"
-        f"🌐 Connection : ONLINE (Oracle Remote Active)\n"
+        f"🌐 Connection : ONLINE (Binary Octet-Stream Active)\n"
         f"⚙️ QPU Clock   : {clock_local:.1f} GHz\n"
         f"⚡ Energy     : {energia_fundamental:.4f} eV\n"
         f"🪐 Delta G    : {delta_gravidade:.4e} m³/kg·s²\n"

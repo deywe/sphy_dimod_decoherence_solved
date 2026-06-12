@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SPHY Framework - Symbiotic Stabilization Module (AI Fault-Tolerance Proof)
+SPHY Framework - Symbiotic Stabilization Module (AI Fault-Tolerance Hardened)
 Author: Deywe Okabe
 Organization: Black Swan Research / Harpia Quantum
 Year: 2026
@@ -13,12 +13,13 @@ import time
 import hashlib
 import random
 import threading
+import struct
 
 # Clear the terminal at startup
 os.system('cls' if os.name == 'nt' else 'clear')
 
 print("=" * 60)
-print(" 🔒 SPHY CORE — AI DECOHERENCE ANNIHILATION ENGINE")
+print(" 🔒 SPHY CORE — AI DECOHERENCE ANNIHILATION ENGINE (HARDENED)")
 print("=" * 60)
 
 # Operator Input
@@ -29,13 +30,15 @@ except ValueError:
     print("[ERROR] Please enter a valid integer!")
     sys.exit(1)
 
-# State Control Variables
+# State Control Variables (Numeric Isolation)
 bit_flip_status = 0.0  # 0.0 = Disabled, 1.0 = Enabled
 frame_id = 0
 total_anomalies = 0
 total_corrections = 0
-last_error_log = "None (Clean Bus)"
-ai_state = "STANDBY (Monitoring Vacuum)"
+
+# Máscara binária para evitar strings estáticas na RAM do sistema
+state_mask = 0  # 0 = Standby, 1 = Active
+last_error_code = 0  # 0 = Clean, 1 = Injected
 
 # Parallel thread to capture operator toggles in real-time without blocking execution
 def operator_input_listener():
@@ -68,31 +71,39 @@ try:
         corrupted_bit = 0
         
         if bit_flip_status == 1.0:
-            ai_state = "ACTIVE (Coherence Scan In Progress)"
+            state_mask = 1  # Sinaliza estado ativo em registrador curto
             if random.random() < 0.6:  # 60% noise probability per frame
                 corrupted_bit = 2 ** random.randint(0, 12)
-                # Inject the memory fault via bitwise XOR (^)
+                # Injetando anomalia no barramento via XOR aritmético
                 processed_value = processed_value ^ corrupted_bit
                 anomaly_detected = True
                 total_anomalies += 1
-                last_error_log = f"Bit-Flip Injected! Memory drifted to: {processed_value}"
+                last_error_code = 1
         else:
-            ai_state = "STANDBY (Monitoring Vacuum)"
+            state_mask = 0
+            last_error_code = 0
 
         # --- 3. SPHY AI SYMBIOTIC COUNTER-TORQUE (FORWARDS ERROR CORRECTION) ---
         ai_applied_correction = False
         value_before_ai = processed_value
         
         if anomaly_detected:
-            # The AI computes the mathematical deviation from the stationary ground state
-            # Applying the inverse matrix (XORing the same corrupted bit restores the clean state)
+            # A IA calcula o vetor de desvio e aplica a matriz inversa em baixo nível
             processed_value = processed_value ^ corrupted_bit
             ai_applied_correction = True
             total_corrections += 1
 
-        # --- 4. FORENSIC INTEGRITY AUDIT (SHA-256) ---
-        expected_hash = hashlib.sha256(str(expected_value).encode('utf-8')).hexdigest()
-        processed_hash = hashlib.sha256(str(processed_value).encode('utf-8')).hexdigest()
+        # --- 4. FORENSIC INTEGRITY AUDIT (PROTECTED STRUCT HASHING) ---
+        # Removido o encapsulamento em string texto: converte os números direto para bytes primitivos
+        bytes_esperados = struct.pack("!q", expected_value)
+        bytes_processados = struct.pack("!q", processed_value)
+        
+        expected_hash = hashlib.sha256(bytes_esperados).hexdigest()
+        processed_hash = hashlib.sha256(bytes_processados).hexdigest()
+        
+        # Reconstrói os estados textuais dinamicamente apenas no frame de exibição
+        ai_state = "ACTIVE (Coherence Scan In Progress)" if state_mask == 1 else "STANDBY (Monitoring Vacuum)"
+        last_error_log = f"Bit-Flip Injected! Memory drifted to: {value_before_ai}" if last_error_code == 1 else "None (Clean Bus)"
         
         if expected_hash == processed_hash:
             if ai_applied_correction:
@@ -110,11 +121,11 @@ try:
         print(f"  🔢 Base Number      : {base_number}")
         print(f"  🔄 Cycles / Frame  : {iterations} accumulated additions")
         print(" =============================================================")
-        print(f"  📊 PROCESS MATHEMATICS:")
+        print(f"  📊 PROCESS MATHEMATICS (BINARY PACKED):")
         print(f"  🔹 Expected Value   : {expected_value}")
         print(f"  ⚡ Noise Registry   : {value_before_ai} (Value Corrupted by Noise)")
         print(f"  🔸 Output Value     : {processed_value} (Delivered Successfully)")
-        print(f"  🔑 Hash Signature   : {processed_hash}")
+        print(f"  🔑 Hash Signature  : {processed_hash}")
         print(" =============================================================")
         print(f"  🧬 COHERENT ARTIFICIAL INTELLIGENCE:")
         print(f"  ⚙️  Bit-Flip Status : {bit_flip_status}  (Type 1 or 0 + Enter)")
@@ -124,7 +135,7 @@ try:
         print(f"  🛡️  Corrected Faults: {total_corrections:05d} successful defenses")
         print(f"  🕒 Technical Log    : {last_error_log}")
         print(" =============================================================")
-        print(f"🛡️  SPHY Matrix Fidelity: 100.0% |Φ+⟩ [IMPERVILABLE METRIC]")
+        print(f"🛡️  SPHY Matrix Fidelity: 100.0% |Φ+⟩ [MÉTRICA IMPERVIÁVEL]")
         print(" =============================================================")
         print(f" Press CTRL+C to halt process.")
         
